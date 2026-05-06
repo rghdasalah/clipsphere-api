@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import VideoPlayer from "@/components/video/VideoPlayer";
 import LikeButton from "@/components/video/LikeButton";
 import ShareButton from "@/components/video/ShareButton";
+import TipButton from "@/components/video/TipButton";
 import CommentSection from "@/components/video/CommentSection";
 import StarRating from "@/components/video/StarRating";
 import Spinner from "@/components/ui/Spinner";
@@ -21,7 +22,7 @@ interface PageProps {
 export default function VideoDetailPage({ params }: PageProps) {
   const { id } = use(params);
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [video, setVideo] = useState<Video | null>(null);
   const [likeCount, setLikeCount] = useState(0);
   const [hasLiked, setHasLiked] = useState(false);
@@ -57,7 +58,6 @@ export default function VideoDetailPage({ params }: PageProps) {
         setHasLiked(data.data?.hasLiked ?? false);
         setStub(false);
 
-        // Fetch presigned stream URL
         try {
           const url = await fetchStreamUrl();
           if (!cancelled) {
@@ -123,7 +123,7 @@ export default function VideoDetailPage({ params }: PageProps) {
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
       <div className="space-y-8">
-        {/* Left column: Player + Metadata */}
+        {/* Player */}
         <div className="space-y-4">
           {videoUnavailable ? (
             <div className="w-full overflow-hidden rounded-xl bg-black">
@@ -154,10 +154,7 @@ export default function VideoDetailPage({ params }: PageProps) {
             </div>
           ) : (
             <div ref={playerWrapperRef}>
-              <VideoPlayer
-                url={presignedUrl}
-                title={video?.title ?? "Video"}
-              />
+              <VideoPlayer url={presignedUrl} title={video?.title ?? "Video"} />
             </div>
           )}
 
@@ -166,6 +163,14 @@ export default function VideoDetailPage({ params }: PageProps) {
             <LikeButton videoId={id} initialLikeCount={likeCount} initialLiked={hasLiked} />
             <ShareButton videoId={id} title={video?.title} />
           </div>
+
+          {/* Tip creator — only for authenticated non-owners */}
+          {isAuthenticated && !isOwner && video && (
+            <TipButton
+              creatorId={video.owner._id}
+              creatorUsername={video.owner.username}
+            />
+          )}
 
           {/* Owner / Admin actions */}
           {(isOwner || canDelete) && video && (
@@ -251,7 +256,7 @@ export default function VideoDetailPage({ params }: PageProps) {
           ) : null}
         </div>
 
-        {/* Reviews/Comments – below player at all breakpoints */}
+        {/* Reviews/Comments */}
         <div>
           <CommentSection videoId={id} />
         </div>

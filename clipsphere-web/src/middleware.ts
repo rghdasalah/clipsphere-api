@@ -10,7 +10,7 @@ function redirectToLogin(request: NextRequest) {
   return NextResponse.redirect(loginUrl);
 }
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const token = request.cookies.get("token")?.value;
 
   if (!token) {
@@ -22,7 +22,6 @@ export async function proxy(request: NextRequest) {
     const secret = process.env.JWT_SECRET;
 
     if (!secret) {
-      // Without JWT_SECRET we cannot verify token integrity — reject the request
       return redirectToLogin(request);
     }
 

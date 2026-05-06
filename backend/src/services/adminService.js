@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const Video = require('../models/Video');
 const Review = require('../models/Review');
+const Transaction = require('../models/Transaction');
 const { AppError } = require('../middleware/errorHandler');
 
 exports.getHealth = () => {
@@ -16,9 +17,13 @@ exports.getHealth = () => {
 exports.getStats = async () => {
   const startOfWeek = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-  const [totalUsers, totalVideos, mostActiveUsers] = await Promise.all([
+  const [totalUsers, totalVideos, tipsAgg, mostActiveUsers] = await Promise.all([
     User.countDocuments(),
     Video.countDocuments(),
+    Transaction.aggregate([
+      { $match: { status: 'completed' } },
+      { $group: { _id: null, total: { $sum: '$amount' } } }
+    ]),
     Video.aggregate([
       {
         $match: {
@@ -65,10 +70,13 @@ exports.getStats = async () => {
     ])
   ]);
 
+  const totalTipsCents = tipsAgg[0]?.total || 0;
+
   return {
     totalUsers,
     totalVideos,
-    totalTips: 0,
+    totalTips: totalTipsCents,
+    totalTipsFormatted: `$${(totalTipsCents / 100).toFixed(2)}`,
     mostActiveUsers
   };
 };

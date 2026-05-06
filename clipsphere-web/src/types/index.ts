@@ -7,6 +7,7 @@ export interface User {
   avatarKey?: string;
   active: boolean;
   accountStatus: "active" | "suspended" | "banned";
+  walletBalance?: number; // in cents
   notificationPreferences: {
     inApp: NotificationToggles;
     email: NotificationToggles;
@@ -73,6 +74,19 @@ export interface Like {
   user: string;
   video: string;
   createdAt: string;
+}
+
+export interface Transaction {
+  _id: string;
+  amount: number; // in cents
+  currency: string;
+  stripeSessionId?: string;
+  stripePaymentIntentId?: string;
+  sender: Pick<User, "_id" | "username" | "avatarKey">;
+  recipient: Pick<User, "_id" | "username" | "avatarKey">;
+  status: "pending" | "completed" | "failed";
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface PaginatedResponse<T> {

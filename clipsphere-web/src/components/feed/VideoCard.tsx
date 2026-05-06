@@ -72,10 +72,28 @@ export default function VideoCard({ video }: VideoCardProps) {
           <img
             src={thumbUrl}
             alt={video.title}
-            className="h-full w-full object-cover"
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
         )}
-        <span className="absolute bottom-1.5 right-1.5 rounded bg-black/80 px-1.5 py-0.5 text-xs font-medium text-brand-400">
+
+        {/* Glassmorphism play button overlay */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-white/10 backdrop-blur-md shadow-lg">
+            <svg className="h-5 w-5 translate-x-0.5 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          </div>
+        </div>
+
+        {/* Glassmorphism title overlay (bottom) */}
+        <div className="absolute inset-x-0 bottom-0 translate-y-full opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
+          <div className="border-t border-white/10 bg-black/40 px-3 py-2 backdrop-blur-md">
+            <p className="truncate text-xs font-medium text-white">{video.title}</p>
+          </div>
+        </div>
+
+        {/* Duration badge */}
+        <span className="absolute bottom-1.5 right-1.5 rounded bg-black/80 px-1.5 py-0.5 text-xs font-medium text-brand-400 group-hover:opacity-0 transition-opacity duration-200">
           {formatDuration(video.duration)}
         </span>
       </div>

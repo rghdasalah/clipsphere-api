@@ -39,6 +39,12 @@ const userSchema = new mongoose.Schema(
       enum: ['active', 'suspended', 'banned'],
       default: 'active'
     },
+    walletBalance: {
+      type: Number,
+      default: 0,
+      min: 0,
+      comment: 'Balance in cents'
+    },
     notificationPreferences: {
       inApp: {
         followers: { type: Boolean, default: true },

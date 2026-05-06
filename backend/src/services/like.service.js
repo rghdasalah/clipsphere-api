@@ -4,7 +4,7 @@ const User = require('../models/User');
 const { AppError } = require('../middleware/errorHandler');
 const notificationService = require('./notification.service');
 
-exports.likeVideo = async (userId, videoId) => {
+exports.likeVideo = async (userId, videoId, io) => {
   const video = await Video.findById(videoId);
   if (!video) throw new AppError('Video not found', 404);
 
@@ -19,8 +19,18 @@ exports.likeVideo = async (userId, videoId) => {
 
   const likeCount = await Like.countDocuments({ video: videoId });
 
-  // Send notification to video owner
   const videoOwner = await User.findById(video.owner);
+
+  // Real-time socket notification to the video owner's private room
+  if (io && videoOwner && video.owner.toString() !== userId.toString()) {
+    const liker = await User.findById(userId).select('username');
+    io.to(video.owner.toString()).emit('new-like', {
+      likerUsername: liker?.username ?? 'Someone',
+      videoTitle: video.title,
+      videoId: video._id.toString()
+    });
+  }
+
   await notificationService.handlePreferenceAwareNotification({
     recipientUser: videoOwner,
     actorId: userId,

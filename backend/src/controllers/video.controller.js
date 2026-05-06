@@ -43,7 +43,8 @@ exports.getTrendingFeed = asyncWrapper(async (req, res) => {
 });
 
 exports.likeVideo = asyncWrapper(async (req, res) => {
-  const result = await likeService.likeVideo(req.user.id, req.params.id);
+  const io = req.app.get('io');
+  const result = await likeService.likeVideo(req.user.id, req.params.id, io);
   res.status(201).json({ status: 'success', data: result });
 });
 

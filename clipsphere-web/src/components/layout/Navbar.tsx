@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { useSocket } from "@/context/SocketContext";
 import { getAvatarUrl } from "@/utils/avatarUrl";
 
 export default function Navbar() {
   const { user, isAuthenticated, logout } = useAuth();
+  const { unreadCount, clearAll } = useSocket();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
@@ -30,6 +32,23 @@ export default function Navbar() {
               <>
                 <Link href="/upload" className="text-text hover:text-brand-400 transition-colors">Upload</Link>
                 <Link href="/settings" className="text-text hover:text-brand-400 transition-colors">Settings</Link>
+
+                {/* Activity icon with notification badge */}
+                <button
+                  onClick={clearAll}
+                  className="relative text-text hover:text-brand-400 transition-colors"
+                  aria-label={unreadCount > 0 ? `${unreadCount} unread notifications` : "Activity"}
+                  title="Activity"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-brand-500 text-[9px] font-bold text-white ring-2 ring-background">
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
+                </button>
               </>
             )}
             {user?.role === "admin" && (
@@ -82,6 +101,17 @@ export default function Navbar() {
               <>
                 <Link href="/upload" className="block text-text hover:text-brand-400 transition-colors" onClick={() => setMobileOpen(false)}>Upload</Link>
                 <Link href="/settings" className="block text-text hover:text-brand-400 transition-colors" onClick={() => setMobileOpen(false)}>Settings</Link>
+                <button
+                  onClick={() => { clearAll(); setMobileOpen(false); }}
+                  className="flex items-center gap-2 text-text hover:text-brand-400 transition-colors"
+                >
+                  Activity
+                  {unreadCount > 0 && (
+                    <span className="rounded-full bg-brand-500 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
+                </button>
               </>
             )}
             {user?.role === "admin" && (

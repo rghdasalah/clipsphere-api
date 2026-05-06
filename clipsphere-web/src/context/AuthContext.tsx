@@ -18,16 +18,12 @@ interface AuthContextType {
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // undefined = initial load in progress, null = not authenticated, User = authenticated
   const [user, setUser] = useState<User | null | undefined>(undefined);
 
   const refreshUser = useCallback(async () => {
     try {
       const token = Cookies.get("token");
-      if (!token) {
-        setUser(null);
-        return;
-      }
+      if (!token) { setUser(null); return; }
       const { data } = await api.get("/users/me");
       setUser(data.data);
     } catch {
@@ -36,30 +32,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Restore session on mount
   useEffect(() => {
-    // refreshUser is async; calling it here is the standard auth-init pattern.
-    // The rule flags it because refreshUser calls setUser, but this is not a synchronous cascade.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     refreshUser();
   }, [refreshUser]);
 
-  const login = useCallback(
-    async (email: string, password: string) => {
-      const { data } = await api.post<ApiResponse<{ token: string; user: User }>>("/auth/login", {
-        email,
-        password,
-      });
-      const token = data.data?.token;
+  const login = useCallback(async (email: string, password: string) => {
+    const { data } = await api.post<ApiResponse<{ token: string; user: User }>>(
+      "/auth/login",
+      { email, password }
+    );
 
-      if (!token) {
-        throw new Error("Login response did not include a token.");
-      }
+    const token = data.data?.token;
+    const userData = data.data?.user;
 
-      Cookies.set("token", token, { expires: 7 });
-      await refreshUser();
-    },
-    [refreshUser]
-  );
+    if (!token || !userData) throw new Error("Login response did not include a token.");
+
+    Cookies.set("token", token, { expires: 7 });
+    // Set user directly — no second API call, no async race with navigation
+    setUser(userData);
+  }, []);
 
   const logout = useCallback(() => {
     Cookies.remove("token");

@@ -107,22 +107,14 @@ exports.setUserStatus = async (targetUserId, status) => {
   return updatedUser;
 };
 
+// ... (keep everything else identical, only change the return at the bottom)
+
 exports.getModerationQueue = async () => {
-  const flagged = await Video.find({ status: 'flagged' }).lean();
+  const flaggedVideos = await Video.find({ status: 'flagged' }).lean();
 
   const lowRatedAgg = await Review.aggregate([
-    {
-      $group: {
-        _id: '$video',
-        averageRating: { $avg: '$rating' },
-        reviewCount: { $sum: 1 }
-      }
-    },
-    {
-      $match: {
-        averageRating: { $lt: 2 }
-      }
-    }
+    { $group: { _id: '$video', averageRating: { $avg: '$rating' }, reviewCount: { $sum: 1 } } },
+    { $match: { averageRating: { $lt: 2 } } }
   ]);
 
   const lowRatedVideoIds = lowRatedAgg.map((item) => item._id);
@@ -130,13 +122,9 @@ exports.getModerationQueue = async () => {
     ? await Video.find({ _id: { $in: lowRatedVideoIds } }).lean()
     : [];
 
-  const flaggedIds = new Set(flagged.map((video) => String(video._id)));
-  const lowRated = lowRatedVideosRaw.filter(
-    (video) => !flaggedIds.has(String(video._id))
-  );
+  const flaggedIds = new Set(flaggedVideos.map((v) => String(v._id)));
+  const lowRatedVideos = lowRatedVideosRaw.filter((v) => !flaggedIds.has(String(v._id)));
 
-  return {
-    flagged,
-    lowRated
-  };
+  // Keys match what the frontend ModerationTable expects
+  return { flaggedVideos, lowRatedVideos };
 };

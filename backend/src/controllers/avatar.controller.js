@@ -65,7 +65,7 @@
  *         description: User ID
  *     responses:
  *       200:
- *         description: Presigned URL for avatar
+ *         description: Presigned URL for avatar, or null if user has no avatar
  *         content:
  *           application/json:
  *             schema:
@@ -79,12 +79,14 @@
  *                   properties:
  *                     url:
  *                       type: string
- *                       description: Presigned S3 URL (expires in 1 hour)
+ *                       nullable: true
+ *                       description: Presigned S3 URL (expires in 1 hour), or null if no avatar
  *                     expiresIn:
  *                       type: integer
  *                       example: 3600
+ *                       nullable: true
  *       404:
- *         description: User or avatar not found
+ *         description: User not found
  */
 const User = require('../models/User');
 const { uploadObject, deleteObject, getPresignedUrl } = require('../services/storage.service');
@@ -138,14 +140,19 @@ exports.uploadAvatar = asyncWrapper(async (req, res) => {
 });
 
 exports.getAvatar = asyncWrapper(async (req, res) => {
-  const user = await User.findById(req.params.id);
+  const user = await User.findById(req.params.id).select('avatarKey');
 
   if (!user) {
     throw new AppError('User not found', 404);
   }
 
+  // No avatar is a normal state — return null instead of throwing 404.
+  // The frontend already handles null gracefully (shows initials fallback).
   if (!user.avatarKey) {
-    throw new AppError('Avatar not found', 404);
+    return res.status(200).json({
+      status: 'success',
+      data: { url: null, expiresIn: null },
+    });
   }
 
   const url = await getPresignedUrl(AVATARS_BUCKET, user.avatarKey, 3600);

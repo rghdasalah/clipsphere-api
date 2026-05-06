@@ -8,30 +8,18 @@ const emailService = require('./email.service');
 exports.register = async (data) => {
   const { username, email, password } = data;
 
-  const existingUser = await User.findOne({
-    $or: [{ email }, { username }]
-  });
+  const existingUser = await User.findOne({ $or: [{ email }, { username }] });
 
   if (existingUser) {
-    if (existingUser.email === email) {
-      throw new AppError('Email already in use', 409);
-    }
-
+    if (existingUser.email === email) throw new AppError('Email already in use', 409);
     throw new AppError('Username already in use', 409);
   }
 
-  // hash password
   const hashedPassword = await bcrypt.hash(password, 10);
-
-  const user = await User.create({
-    username,
-    email,
-    password: hashedPassword
-  });
+  const user = await User.create({ username, email, password: hashedPassword });
 
   emailService.sendWelcomeEmail(user).catch(() => {});
 
-  // generate token
   const token = jwt.sign(
     { id: user._id, role: user.role },
     process.env.JWT_SECRET,
@@ -41,10 +29,15 @@ exports.register = async (data) => {
   return {
     token,
     user: {
-      id: user._id,
+      _id: user._id,                  // ← was 'id', changed to '_id'
       username: user.username,
       email: user.email,
-      role: user.role
+      role: user.role,
+      active: user.active,
+      accountStatus: user.accountStatus,
+      notificationPreferences: user.notificationPreferences,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt
     }
   };
 };
@@ -52,26 +45,15 @@ exports.register = async (data) => {
 exports.login = async (data) => {
   const { email, password } = data;
 
-  // check if user exists + get password
   const user = await User.findOne({ email }).select('+password');
+  if (!user) throw new AppError('Invalid email or password', 401);
 
-  if (!user) {
-    throw new AppError('Invalid email or password', 401);
-  }
-
-  // compare password
   const isMatch = await bcrypt.compare(password, user.password);
-
-  if (!isMatch) {
-    throw new AppError('Invalid email or password', 401);
-  }
+  if (!isMatch) throw new AppError('Invalid email or password', 401);
 
   const accountStateError = getAccountStateError(user);
-  if (accountStateError) {
-    throw accountStateError;
-  }
+  if (accountStateError) throw accountStateError;
 
-  // generate token
   const token = jwt.sign(
     { id: user._id, role: user.role },
     process.env.JWT_SECRET,
@@ -81,10 +63,15 @@ exports.login = async (data) => {
   return {
     token,
     user: {
-      id: user._id,
+      _id: user._id,                  // ← was 'id', changed to '_id'
       username: user.username,
       email: user.email,
-      role: user.role
+      role: user.role,
+      active: user.active,
+      accountStatus: user.accountStatus,
+      notificationPreferences: user.notificationPreferences,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt
     }
   };
 };

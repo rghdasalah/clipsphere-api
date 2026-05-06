@@ -9,13 +9,14 @@ interface StatsCardsProps {
   stats: {
     totalUsers: number;
     totalVideos: number;
+    totalTipsFormatted?: string;
     mostActiveUsers: MostActiveUser[];
   };
 }
 
 export default function StatsCards({ stats }: StatsCardsProps) {
   return (
-    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
       {/* Total Users */}
       <div className="rounded-xl bg-surface-2 border border-border p-6">
         <div className="flex items-center gap-3">
@@ -38,13 +39,26 @@ export default function StatsCards({ stats }: StatsCardsProps) {
         <p className="mt-3 text-4xl font-bold text-gold">{stats.totalVideos.toLocaleString()}</p>
       </div>
 
+      {/* Total Tips */}
+      <div className="rounded-xl bg-surface-2 border border-border p-6">
+        <div className="flex items-center gap-3">
+          <svg className="h-8 w-8 text-green-400 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+          </svg>
+          <span className="text-sm font-medium text-text-muted">Total Tips</span>
+        </div>
+        <p className="mt-3 text-4xl font-bold text-green-400">
+          {stats.totalTipsFormatted ?? "$0.00"}
+        </p>
+      </div>
+
       {/* Most Active Users */}
-      <div className="rounded-xl bg-surface-2 border border-border p-6 sm:col-span-2 lg:col-span-1">
+      <div className="rounded-xl bg-surface-2 border border-border p-6">
         <div className="flex items-center gap-3">
           <svg className="h-8 w-8 text-violet opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 0 1 3 3h-15a3 3 0 0 1 3-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.007 0H9.497m5.007 0a7.454 7.454 0 0 1-.982-3.172M9.497 14.25a7.454 7.454 0 0 0 .981-3.172M5.25 4.236c-.982.143-1.954.317-2.916.52A6.003 6.003 0 0 0 7.73 9.728M5.25 4.236V4.5c0 2.108.966 3.99 2.48 5.228M5.25 4.236V2.721C7.456 2.41 9.71 2.25 12 2.25c2.291 0 4.545.16 6.75.47v1.516M18.75 4.236c.982.143 1.954.317 2.916.52A6.003 6.003 0 0 1 16.27 9.728M18.75 4.236V4.5c0 2.108-.966 3.99-2.48 5.228m0 0a6.023 6.023 0 0 1-2.77.672 6.023 6.023 0 0 1-2.77-.672" />
           </svg>
-          <span className="text-sm font-medium text-text-muted">Most Active Users</span>
+          <span className="text-sm font-medium text-text-muted">Most Active</span>
         </div>
         <ul className="mt-3 space-y-1.5">
           {stats.mostActiveUsers.length === 0 && (

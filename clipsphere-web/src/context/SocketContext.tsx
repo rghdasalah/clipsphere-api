@@ -44,7 +44,6 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const socketRef = useRef<Socket | null>(null);
 
   const dismissToast = useCallback(() => setActiveToast(null), []);
-
   const clearAll = useCallback(() => {
     setUnreadCount(0);
     setActiveToast(null);
@@ -61,23 +60,38 @@ export function SocketProvider({ children }: { children: ReactNode }) {
 
     const socket = io(socketUrl, {
       auth: { token },
-      transports: ["websocket"],
+      // Allow fallback to long-polling when websocket is blocked (some
+      // corporate networks, browser extensions, dev proxies).
+      transports: ["websocket", "polling"],
+      reconnectionAttempts: 5,
+      timeout: 10_000,
     });
 
     socketRef.current = socket;
 
-    socket.on("new-like", (data: { likerUsername: string; videoTitle: string; videoId: string }) => {
-      const notif: LiveNotification = {
-        id: `${Date.now()}-${Math.random()}`,
-        type: "new-like",
-        likerUsername: data.likerUsername,
-        videoTitle: data.videoTitle,
-        videoId: data.videoId,
-        createdAt: new Date(),
-      };
-      setUnreadCount((prev) => prev + 1);
-      setActiveToast(notif);
+    socket.on("connect_error", (err) => {
+      console.warn("[socket] connect error:", err.message);
     });
+
+    socket.on(
+      "new-like",
+      (data: {
+        likerUsername: string;
+        videoTitle: string;
+        videoId: string;
+      }) => {
+        const notif: LiveNotification = {
+          id: `${Date.now()}-${Math.random()}`,
+          type: "new-like",
+          likerUsername: data.likerUsername,
+          videoTitle: data.videoTitle,
+          videoId: data.videoId,
+          createdAt: new Date(),
+        };
+        setUnreadCount((prev) => prev + 1);
+        setActiveToast(notif);
+      }
+    );
 
     return () => {
       socket.disconnect();

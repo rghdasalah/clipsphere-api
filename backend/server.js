@@ -6,26 +6,27 @@ const app = require('./src/app');
 const mongoose = require('mongoose');
 
 const PORT = process.env.PORT || 5000;
+const isDev = process.env.NODE_ENV !== 'production';
 
-// ── Allowed origins (mirrors app.js CORS config) ──────────────────────────────
+// ── Allowed origins (mirrors app.js CORS config) ──────────────────────────
 const defaultCorsOrigins = [
   'http://localhost:3000',
   'http://localhost:5173',
-  'http://localhost:5000'
+  'http://localhost:5000',
 ];
 const allowedOrigins = process.env.CORS_ORIGINS
-  ? process.env.CORS_ORIGINS.split(',').map(o => o.trim()).filter(Boolean)
+  ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean)
   : defaultCorsOrigins;
 
-// ── HTTP server ───────────────────────────────────────────────────────────────
+// ── HTTP server ───────────────────────────────────────────────────────────
 const server = http.createServer(app);
 
-// ── Socket.io ─────────────────────────────────────────────────────────────────
+// ── Socket.io ─────────────────────────────────────────────────────────────
 const io = new Server(server, {
   cors: {
     origin: allowedOrigins,
-    credentials: true
-  }
+    credentials: true,
+  },
 });
 
 // JWT auth middleware for Socket.io
@@ -43,23 +44,36 @@ io.use((socket, next) => {
 });
 
 io.on('connection', (socket) => {
-  // Join the user's private room so events are routed only to them
   socket.join(socket.userId);
   console.log(`Socket connected: user ${socket.userId}`);
-
   socket.on('disconnect', () => {
     console.log(`Socket disconnected: user ${socket.userId}`);
   });
 });
 
-// Make io available to Express controllers via req.app.get('io')
 app.set('io', io);
 
-// ── DB + startup ──────────────────────────────────────────────────────────────
-mongoose.connect(process.env.MONGODB_URI)
+// ── Fail-fast env checks ──────────────────────────────────────────────────
+if (!process.env.JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET is not set. Refusing to start.');
+  process.exit(1);
+}
+if (!process.env.MONGODB_URI) {
+  console.error('FATAL: MONGODB_URI is not set. Refusing to start.');
+  process.exit(1);
+}
+
+// ── DB + startup ──────────────────────────────────────────────────────────
+mongoose
+  .connect(process.env.MONGODB_URI, {
+    serverSelectionTimeoutMS: 10_000, // fail fast in dev instead of hanging
+  })
   .then(async () => {
     console.log('DB connected');
 
+    // Best-effort storage init. In dev, missing MinIO must NOT kill the API
+    // — auth/feed/profile endpoints don't need it. Upload endpoints will
+    // surface a clean error when actually called.
     try {
       const { ensureBucketExists } = require('./src/services/storage.service');
       const { VIDEOS_BUCKET, AVATARS_BUCKET } = require('./src/config/s3');
@@ -67,14 +81,23 @@ mongoose.connect(process.env.MONGODB_URI)
       await ensureBucketExists(AVATARS_BUCKET);
       console.log('Storage buckets ready');
     } catch (s3Err) {
-      console.error('Storage initialization failed:', s3Err.message);
-      process.exit(1);
+      const msg = `Storage initialization failed: ${s3Err.message}`;
+      if (isDev) {
+        console.warn(`[warn] ${msg}`);
+        console.warn(
+          '[warn] Continuing without MinIO. Upload endpoints will return errors until MinIO is running.'
+        );
+      } else {
+        console.error(msg);
+        process.exit(1);
+      }
     }
 
     server.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });
   })
-  .catch(err => {
-    console.error('DB connection error:', err);
+  .catch((err) => {
+    console.error('DB connection error:', err.message);
+    process.exit(1);
   });

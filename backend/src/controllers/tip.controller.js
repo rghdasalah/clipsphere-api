@@ -7,11 +7,12 @@ exports.createCheckout = asyncWrapper(async (req, res) => {
   res.status(201).json({ status: 'success', data: result });
 });
 
-// Webhook: not wrapped in asyncWrapper — Stripe needs a plain 400 on error, not our error handler format
+// Webhook: not wrapped in asyncWrapper — Stripe needs a plain 400 on error.
 exports.handleWebhook = async (req, res) => {
   const sig = req.headers['stripe-signature'];
+  const io = req.app.get('io');
   try {
-    await tipService.handleWebhookEvent(req.body, sig);
+    await tipService.handleWebhookEvent(req.body, sig, io);
     res.json({ received: true });
   } catch (err) {
     console.error('Stripe webhook error:', err.message);

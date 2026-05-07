@@ -12,16 +12,25 @@ import {
 import type { ReactNode } from "react";
 import { io, Socket } from "socket.io-client";
 import Cookies from "js-cookie";
+import api from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 
-export interface LiveNotification {
-  id: string;
-  type: "new-like";
-  likerUsername: string;
-  videoTitle: string;
-  videoId: string;
-  createdAt: Date;
-}
+export type LiveNotification =
+  | {
+      id: string;
+      type: "new-like";
+      likerUsername: string;
+      videoTitle: string;
+      videoId: string;
+      createdAt: Date;
+    }
+  | {
+      id: string;
+      type: "new-tip";
+      senderUsername: string;
+      amountFormatted: string;
+      createdAt: Date;
+    };
 
 interface SocketContextType {
   unreadCount: number;
@@ -44,10 +53,41 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const socketRef = useRef<Socket | null>(null);
 
   const dismissToast = useCallback(() => setActiveToast(null), []);
-  const clearAll = useCallback(() => {
+
+  // "Clear all" now persists to the server so a reload reflects it.
+  const clearAll = useCallback(async () => {
     setUnreadCount(0);
     setActiveToast(null);
+    try {
+      await api.patch("/notifications/read-all");
+    } catch (err) {
+      console.warn("[notifications] failed to mark read on server:", err);
+    }
   }, []);
+
+  // Hydrate the unread count from the DB whenever auth becomes ready.
+  useEffect(() => {
+    if (isLoading || !isAuthenticated) {
+      setUnreadCount(0);
+      return;
+    }
+    let cancelled = false;
+    api
+      .get<{ status: string; data: { unreadCount: number } }>(
+        "/notifications/unread-count"
+      )
+      .then(({ data }) => {
+        if (!cancelled && typeof data.data?.unreadCount === "number") {
+          setUnreadCount(data.data.unreadCount);
+        }
+      })
+      .catch((err) =>
+        console.warn("[notifications] initial unread fetch failed:", err.message)
+      );
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, isLoading]);
 
   useEffect(() => {
     if (isLoading || !isAuthenticated) return;
@@ -60,8 +100,6 @@ export function SocketProvider({ children }: { children: ReactNode }) {
 
     const socket = io(socketUrl, {
       auth: { token },
-      // Allow fallback to long-polling when websocket is blocked (some
-      // corporate networks, browser extensions, dev proxies).
       transports: ["websocket", "polling"],
       reconnectionAttempts: 5,
       timeout: 10_000,
@@ -75,21 +113,30 @@ export function SocketProvider({ children }: { children: ReactNode }) {
 
     socket.on(
       "new-like",
-      (data: {
-        likerUsername: string;
-        videoTitle: string;
-        videoId: string;
-      }) => {
-        const notif: LiveNotification = {
+      (data: { likerUsername: string; videoTitle: string; videoId: string }) => {
+        setUnreadCount((prev) => prev + 1);
+        setActiveToast({
           id: `${Date.now()}-${Math.random()}`,
           type: "new-like",
           likerUsername: data.likerUsername,
           videoTitle: data.videoTitle,
           videoId: data.videoId,
           createdAt: new Date(),
-        };
+        });
+      }
+    );
+
+    socket.on(
+      "new-tip",
+      (data: { senderUsername: string; amountFormatted: string }) => {
         setUnreadCount((prev) => prev + 1);
-        setActiveToast(notif);
+        setActiveToast({
+          id: `${Date.now()}-${Math.random()}`,
+          type: "new-tip",
+          senderUsername: data.senderUsername,
+          amountFormatted: data.amountFormatted,
+          createdAt: new Date(),
+        });
       }
     );
 

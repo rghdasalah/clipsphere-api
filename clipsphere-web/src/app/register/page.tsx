@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { AxiosError } from "axios";
+import { registerSchema, firstIssueMessage } from "@/validators/auth.validators";
 
 function getRedirectTarget(): string {
   if (typeof window === "undefined") return "/";
@@ -44,27 +45,24 @@ export default function RegisterPage() {
     return () => window.clearTimeout(fallback);
   }, [authLoading, isAuthenticated, router]);
 
-  function validate(): string | null {
-    if (username.trim().length < 3) return "Username must be at least 3 characters";
-    if (!email.trim()) return "Email is required";
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "Invalid email format";
-    if (password.length < 8) return "Password must be at least 8 characters";
-    if (password !== confirmPassword) return "Passwords do not match";
-    return null;
-  }
-
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
-    const validationError = validate();
-    if (validationError) {
-      setError(validationError);
+
+    const parsed = registerSchema.safeParse({
+      username,
+      email,
+      password,
+      confirmPassword,
+    });
+    if (!parsed.success) {
+      setError(firstIssueMessage(parsed.error));
       return;
     }
 
     setIsSubmitting(true);
     try {
-      await register(username.trim(), email.trim(), password);
+      await register(parsed.data.username, parsed.data.email, parsed.data.password);
       window.setTimeout(() => setIsSubmitting(false), 1500);
     } catch (err) {
       const axiosErr = err as AxiosError<{ message?: string }>;
@@ -89,10 +87,7 @@ export default function RegisterPage() {
 
         <form onSubmit={handleSubmit} className="space-y-5" noValidate>
           <div>
-            <label
-              htmlFor="username"
-              className="mb-1 block text-sm font-medium text-text-muted"
-            >
+            <label htmlFor="username" className="mb-1 block text-sm font-medium text-text-muted">
               Username
             </label>
             <input
@@ -108,10 +103,7 @@ export default function RegisterPage() {
           </div>
 
           <div>
-            <label
-              htmlFor="email"
-              className="mb-1 block text-sm font-medium text-text-muted"
-            >
+            <label htmlFor="email" className="mb-1 block text-sm font-medium text-text-muted">
               Email
             </label>
             <input
@@ -127,10 +119,7 @@ export default function RegisterPage() {
           </div>
 
           <div>
-            <label
-              htmlFor="password"
-              className="mb-1 block text-sm font-medium text-text-muted"
-            >
+            <label htmlFor="password" className="mb-1 block text-sm font-medium text-text-muted">
               Password
             </label>
             <input
@@ -146,10 +135,7 @@ export default function RegisterPage() {
           </div>
 
           <div>
-            <label
-              htmlFor="confirmPassword"
-              className="mb-1 block text-sm font-medium text-text-muted"
-            >
+            <label htmlFor="confirmPassword" className="mb-1 block text-sm font-medium text-text-muted">
               Confirm Password
             </label>
             <input
@@ -177,10 +163,7 @@ export default function RegisterPage() {
 
         <p className="mt-6 text-center text-sm text-text-muted">
           Already have an account?{" "}
-          <Link
-            href="/login"
-            className="font-medium text-brand-400 hover:text-brand-300"
-          >
+          <Link href="/login" className="font-medium text-brand-400 hover:text-brand-300">
             Sign in
           </Link>
         </p>

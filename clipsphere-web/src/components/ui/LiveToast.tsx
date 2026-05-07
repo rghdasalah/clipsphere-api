@@ -5,24 +5,34 @@ import Link from "next/link";
 import clsx from "clsx";
 
 interface LiveToastProps {
-  likerUsername: string;
-  videoTitle: string;
-  videoId?: string;
+  kind: "like" | "tip";
+  primaryText: string;
+  secondaryText?: string;
+  href?: string;
   onClose: () => void;
 }
 
+const ICON: Record<LiveToastProps["kind"], string> = {
+  like: "♥",
+  tip: "💸",
+};
+
+const HEADER: Record<LiveToastProps["kind"], string> = {
+  like: "New Like!",
+  tip: "New Tip!",
+};
+
 export default function LiveToast({
-  likerUsername,
-  videoTitle,
-  videoId,
+  kind,
+  primaryText,
+  secondaryText,
+  href,
   onClose,
 }: LiveToastProps) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    // Trigger slide-in on next tick
     const showTimer = setTimeout(() => setVisible(true), 10);
-    // Auto-dismiss after 5 s
     const hideTimer = setTimeout(() => {
       setVisible(false);
       setTimeout(onClose, 300);
@@ -48,33 +58,29 @@ export default function LiveToast({
       )}
     >
       <div className="flex items-start gap-3 p-4">
-        {/* Icon */}
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-500/20 text-brand-500 text-sm">
-          ♥
+          {ICON[kind]}
         </div>
 
-        {/* Content */}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-text-strong">New Like!</p>
-          <p className="mt-0.5 text-xs text-text-muted">
-            <span className="font-medium text-brand-400">{likerUsername}</span>{" "}
-            liked{" "}
-            <span className="text-text">
-              &ldquo;{videoTitle}&rdquo;
-            </span>
-          </p>
-          {videoId && (
+          <p className="text-sm font-semibold text-text-strong">{HEADER[kind]}</p>
+          <p className="mt-0.5 text-xs text-text-muted">{primaryText}</p>
+          {secondaryText && (
+            <p className="mt-0.5 text-[11px] text-text-faint truncate">
+              {secondaryText}
+            </p>
+          )}
+          {href && (
             <Link
-              href={`/video/${videoId}`}
-              className="mt-1.5 inline-block text-xs font-medium text-brand-400 hover:text-brand-300 transition-colors"
+              href={href}
               onClick={handleClose}
+              className="mt-1.5 inline-block text-xs font-medium text-brand-400 hover:text-brand-300 transition-colors"
             >
-              View video →
+              Open →
             </Link>
           )}
         </div>
 
-        {/* Dismiss */}
         <button
           onClick={handleClose}
           className="shrink-0 text-text-faint hover:text-text-muted transition-colors"
@@ -84,13 +90,10 @@ export default function LiveToast({
         </button>
       </div>
 
-      {/* Progress bar */}
       <div className="overflow-hidden rounded-b-xl">
         <div
           className="h-0.5 bg-brand-500 animate-[shrink_5s_linear_forwards]"
-          style={{
-            animationDelay: "10ms",
-          }}
+          style={{ animationDelay: "10ms" }}
         />
       </div>
     </div>

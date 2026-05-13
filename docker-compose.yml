@@ -1,0 +1,206 @@
+# Top-level orchestrator for ClipSphere Phase 4.
+# Brings up the full stack: mongo, minio, redis, backend, worker, frontend, nginx.
+# Single bridge network; only nginx (80/443) and minio console (9001) are exposed to the host.
+
+x-backend-build: &backend-build
+  context: ./backend
+  dockerfile: Dockerfile
+
+services:
+  mongo:
+    image: mongo:7
+    container_name: clipsphere-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE:-clipsphere}
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - clipsphere-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  minio:
+    image: minio/minio:latest
+    container_name: clipsphere-minio
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9001:9001"   # Web console only — data path goes through Nginx /storage.
+    networks:
+      - clipsphere-net
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    container_name: clipsphere-redis
+    restart: unless-stopped
+    command:
+      - "redis-server"
+      - "--appendonly"
+      - "yes"
+      - "--maxmemory"
+      - "256mb"
+      - "--maxmemory-policy"
+      - "allkeys-lru"
+    volumes:
+      - redis_data:/data
+    networks:
+      - clipsphere-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build: *backend-build
+    image: clipsphere/backend:phase4
+    container_name: clipsphere-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      MONGODB_URI: mongodb://mongo:27017/${MONGO_INITDB_DATABASE:-clipsphere}
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://clipsphere.local}
+      CLIENT_URL: ${CLIENT_URL:-https://clipsphere.local}
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_BUCKET_VIDEOS: ${MINIO_BUCKET_VIDEOS:-clipsphere-videos}
+      MINIO_BUCKET_AVATARS: ${MINIO_BUCKET_AVATARS:-clipsphere-avatars}
+      MINIO_USE_SSL: "false"
+      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-https://clipsphere.local/storage}
+      REDIS_URL: redis://redis:6379
+      SMTP_HOST: ${SMTP_HOST:-smtp.ethereal.email}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      EMAIL_FROM: ${EMAIL_FROM:-ClipSphere <noreply@clipsphere.local>}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_placeholder}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+    depends_on:
+      mongo: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      minio: { condition: service_healthy }
+    networks:
+      - clipsphere-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  worker:
+    image: clipsphere/backend:phase4
+    container_name: clipsphere-worker
+    restart: unless-stopped
+    command: ["node", "worker.js"]
+    environment:
+      NODE_ENV: production
+      MONGODB_URI: mongodb://mongo:27017/${MONGO_INITDB_DATABASE:-clipsphere}
+      JWT_SECRET: ${JWT_SECRET}
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_BUCKET_VIDEOS: ${MINIO_BUCKET_VIDEOS:-clipsphere-videos}
+      MINIO_BUCKET_AVATARS: ${MINIO_BUCKET_AVATARS:-clipsphere-avatars}
+      MINIO_USE_SSL: "false"
+      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-https://clipsphere.local/storage}
+      REDIS_URL: redis://redis:6379
+      SMTP_HOST: ${SMTP_HOST:-smtp.ethereal.email}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      EMAIL_FROM: ${EMAIL_FROM:-ClipSphere <noreply@clipsphere.local>}
+      CLIENT_URL: ${CLIENT_URL:-https://clipsphere.local}
+      WORKER_HEALTH_PORT: 9100
+    depends_on:
+      mongo: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      backend: { condition: service_started }
+    networks:
+      - clipsphere-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9100/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  frontend:
+    build:
+      context: ./clipsphere-web
+      dockerfile: Dockerfile
+    image: clipsphere/frontend:phase4
+    container_name: clipsphere-web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      BACKEND_INTERNAL_URL: http://backend:5000
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api/v1}
+      NEXT_PUBLIC_SOCKET_URL: ${NEXT_PUBLIC_SOCKET_URL:-https://clipsphere.local}
+    depends_on:
+      backend: { condition: service_started }
+    networks:
+      - clipsphere-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: clipsphere-nginx
+    restart: unless-stopped
+    depends_on:
+      backend: { condition: service_healthy }
+      frontend: { condition: service_started }
+      minio: { condition: service_healthy }
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+      - ./nginx/static:/usr/share/nginx/static:ro
+      - nginx_cache:/var/cache/nginx
+    networks:
+      - clipsphere-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health-nginx || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mongo_data:
+  minio_data:
+  redis_data:
+  nginx_cache:
+
+networks:
+  clipsphere-net:
+    driver: bridge

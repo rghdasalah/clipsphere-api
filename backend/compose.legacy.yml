@@ -1,3 +1,6 @@
+# DEPRECATED in Phase 4. The top-level docker-compose.yml at
+# clipsphere-api/docker-compose.yml supersedes this file.
+# Kept for reference only.
 services:
   mongo:
     image: mongo:7

@@ -9,3 +9,8 @@ coverage/
 scripts/test-phase1.js
 backend/docs/openapi.json
 backend/docs-site/
+
+# Phase 4
+.env
+nginx/certs/*.crt
+nginx/certs/*.key

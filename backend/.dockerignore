@@ -1,0 +1,17 @@
+node_modules
+npm-debug.log
+.env
+.env.*
+!.env.example
+.git
+.gitignore
+postman
+docs
+docs-site
+*.md
+Dockerfile*
+.dockerignore
+scripts/seed-test-admin.js
+coverage
+.vscode
+.idea

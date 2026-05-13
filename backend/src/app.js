@@ -22,6 +22,10 @@ const notificationRoutes = require('./routes/notification.routes'); // NEW
 
 const app = express();
 
+// Required behind Nginx (Phase 4): without this, express-rate-limit sees the
+// internal Docker IP for every request, and req.ip is wrong.
+app.set('trust proxy', 1);
+
 const isDev = process.env.NODE_ENV !== 'production';
 
 const defaultCorsOrigins = [

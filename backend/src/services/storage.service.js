@@ -6,7 +6,7 @@ const {
 } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { GetObjectCommand } = require('@aws-sdk/client-s3');
-const { s3Client } = require('../config/s3');
+const { s3Client, s3PublicClient } = require('../config/s3');
 
 exports.uploadObject = async (bucket, key, body, contentType) => {
   await s3Client.send(
@@ -27,8 +27,11 @@ exports.deleteObject = async (bucket, key) => {
 };
 
 exports.getPresignedUrl = async (bucket, key, expiresIn = 3600) => {
+  // Sign with the public-endpoint client so the URL is resolvable by the
+  // browser (e.g. https://clipsphere.local/storage/...). Signing with the
+  // internal client would encode minio:9000 — unreachable from the browser.
   return getSignedUrl(
-    s3Client,
+    s3PublicClient,
     new GetObjectCommand({ Bucket: bucket, Key: key }),
     { expiresIn }
   );

@@ -33,7 +33,9 @@ function wrapHtml(title, body) {
 </html>`;
 }
 
-exports.sendWelcomeEmail = async (user) => {
+// _sendWelcomeNow performs the actual SMTP send. The worker calls this; the
+// queueing API in src/queues/email.queue.js is what app code uses.
+exports._sendWelcomeNow = async (user) => {
   try {
     const transporter = await getTransporter();
     const html = wrapHtml(
@@ -90,7 +92,8 @@ function buildEngagementBody(actorName, type, meta) {
   }
 }
 
-exports.sendEngagementEmail = async (recipient, actorId, type, meta) => {
+// _sendEngagementNow performs the actual SMTP send. The worker calls this.
+exports._sendEngagementNow = async (recipient, actorId, type, meta) => {
   try {
     const transporter = await getTransporter();
 
@@ -121,3 +124,10 @@ exports.sendEngagementEmail = async (recipient, actorId, type, meta) => {
     console.error('Failed to send engagement email:', err.message);
   }
 };
+
+// Backward-compatible exports: code that still calls sendWelcomeEmail /
+// sendEngagementEmail directly is transparently routed through the queue.
+const { enqueueWelcomeEmail, enqueueEngagementEmail } = require('../queues/email.queue');
+exports.sendWelcomeEmail = (user) => enqueueWelcomeEmail(user);
+exports.sendEngagementEmail = (recipient, actorId, type, meta) =>
+  enqueueEngagementEmail(recipient, actorId, type, meta);

@@ -31,6 +31,10 @@ const videoSchema = new mongoose.Schema(
       required: true,
       max: 300 // 5 minutes
     },
+    // Populated asynchronously by the worker container after upload.
+    width: { type: Number },
+    height: { type: Number },
+    codec: { type: String },
     viewsCount: {
       type: Number,
       default: 0

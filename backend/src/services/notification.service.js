@@ -1,5 +1,5 @@
 const Notification = require('../models/Notification');
-const emailService = require('./email.service');
+const { enqueueEngagementEmail } = require('../queues/email.queue');
 
 const buildNotificationPayload = ({ recipientId, actorId, type, videoId }) => ({
   recipient: recipientId,
@@ -49,7 +49,9 @@ exports.handlePreferenceAwareNotification = async ({
   }
 
   if (prefs?.email?.[preferenceKey]) {
-    emailService.sendEngagementEmail(recipientUser, actorId, type, { videoId });
+    enqueueEngagementEmail(recipientUser, actorId, type, { videoId }).catch(
+      (err) => console.warn('[notification] engagement enqueue failed:', err.message)
+    );
   }
 
   return notifications;

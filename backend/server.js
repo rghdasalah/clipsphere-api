@@ -62,6 +62,11 @@ if (!process.env.MONGODB_URI) {
   console.error('FATAL: MONGODB_URI is not set. Refusing to start.');
   process.exit(1);
 }
+if (!process.env.REDIS_URL) {
+  console.warn(
+    '[startup] REDIS_URL not set. BullMQ enqueue and trending cache will fail.'
+  );
+}
 
 // ── DB + startup ──────────────────────────────────────────────────────────
 mongoose

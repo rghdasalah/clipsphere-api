@@ -60,6 +60,8 @@ const { VIDEOS_BUCKET } = require('../config/s3');
 const { AppError, asyncWrapper } = require('../middleware/errorHandler');
 const { uploadVideoSchema } = require('../validators/upload.validators');
 const { generateThumbnail } = require('../utils/thumbnailGenerator');
+const { enqueueVideoProbe } = require('../queues/video.queue');
+const { bustTrending } = require('../middleware/cache');
 
 const uploadVideoHandler = asyncWrapper(async (req, res) => {
   const parsed = uploadVideoSchema.safeParse(req.body);
@@ -112,6 +114,15 @@ const uploadVideoHandler = asyncWrapper(async (req, res) => {
     }
     throw dbErr;
   }
+
+  // Async metadata enrichment in the worker container (width/height/codec).
+  // The synchronous 300-second duration gate has already run upstream.
+  enqueueVideoProbe(video._id, VIDEOS_BUCKET, key).catch((err) =>
+    console.warn('[upload] probe enqueue failed:', err.message)
+  );
+
+  // A new public video changes the trending set.
+  if ((status || 'public') === 'public') bustTrending();
 
   res.status(201).json({ status: 'success', data: { video } });
 });

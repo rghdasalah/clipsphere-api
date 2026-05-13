@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { AppError } = require('../middleware/errorHandler');
 const { getAccountStateError } = require('../utils/accountState');
-const emailService = require('./email.service');
+const { enqueueWelcomeEmail } = require('../queues/email.queue');
 
 const TOKEN_TTL = '24h';
 
@@ -49,12 +49,10 @@ exports.register = async (data) => {
     password: hashedPassword,
   });
 
-  // Fire-and-forget. NEVER await: must not block the response.
-  emailService
-    .sendWelcomeEmail(user)
-    .catch((err) =>
-      console.warn('[auth] welcome email failed:', err.message)
-    );
+  // Fire-and-forget enqueue. The worker container actually sends the email.
+  enqueueWelcomeEmail(user).catch((err) =>
+    console.warn('[auth] welcome email enqueue failed:', err.message)
+  );
 
   return { token: signToken(user), user: publicUser(user) };
 };

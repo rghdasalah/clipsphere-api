@@ -42,6 +42,12 @@ exports.getTrendingFeed = asyncWrapper(async (req, res) => {
   res.json({ status: 'success', results: result.videos.length, data: result });
 });
 
+exports.getForYouFeed = asyncWrapper(async (req, res) => {
+  const { page = 1, limit = 20 } = req.query;
+  const result = await feedService.getForYouFeed(req.user.id, page, limit);
+  res.json({ status: 'success', results: result.videos.length, data: result });
+});
+
 exports.likeVideo = asyncWrapper(async (req, res) => {
   const io = req.app.get('io');
   const result = await likeService.likeVideo(req.user.id, req.params.id, io);

@@ -5,10 +5,12 @@ const { AppError } = require('../middleware/errorHandler');
 const notificationService = require('./notification.service');
 const { deleteObject } = require('./storage.service');
 const { VIDEOS_BUCKET } = require('../config/s3');
+const { bustTrending } = require('../middleware/cache');
 
 exports.createVideo = async (userId, data) => {
   const video = await Video.create({ ...data, owner: userId });
   await video.populate('owner', 'username avatarKey');
+  if ((data.status || 'public') === 'public') bustTrending();
   return video;
 };
 
@@ -27,6 +29,7 @@ exports.updateVideo = async (videoId, updates) => {
   Object.assign(video, updates);
   await video.save();
   await video.populate('owner', 'username avatarKey');
+  if (video.status === 'public') bustTrending();
   return video;
 };
 
@@ -35,6 +38,7 @@ exports.deleteVideo = async (videoId) => {
   if (!video) throw new AppError('Video not found', 404);
 
   const objectKey = video.key;
+  const wasPublic = video.status === 'public';
   await video.deleteOne();
 
   if (objectKey) {
@@ -44,6 +48,7 @@ exports.deleteVideo = async (videoId) => {
       console.error(`Failed to delete S3 object ${objectKey}:`, err.message);
     }
   }
+  if (wasPublic) bustTrending();
 };
 
 exports.addReview = async (userId, videoId, data) => {
@@ -62,5 +67,11 @@ exports.addReview = async (userId, videoId, data) => {
     videoId: video._id
   });
 
+  // Bonus: each review adds rating*2 to trendingScore (create-only — update/delete
+  // are intentionally NOT tracked; see plan limitations).
+  await Video.findByIdAndUpdate(videoId, { $inc: { trendingScore: data.rating * 2 } });
+
+  // Reviews influence the trending sort (averageRating, latestReviewAt).
+  bustTrending();
   return review;
 };

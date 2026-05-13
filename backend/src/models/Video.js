@@ -35,6 +35,9 @@ const videoSchema = new mongoose.Schema(
     width: { type: Number },
     height: { type: Number },
     codec: { type: String },
+    // Bonus: incremental trending score. Likes +10, reviews +rating*2. Freshness
+    // bonus is added at query time in feed.service.js getForYouFeed.
+    trendingScore: { type: Number, default: 0, index: true },
     viewsCount: {
       type: Number,
       default: 0

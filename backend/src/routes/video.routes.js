@@ -12,6 +12,7 @@ const {
 } = require('../validators/video.validators');
 const { ensureVideoOwnerForUpdate, ensureVideoOwnerOrAdminForDelete } = require('../middleware/videoOwnership');
 const { feedQuerySchema, videoIdParamSchema } = require('../validators/feed.validators');
+const { trendingCache } = require('../middleware/cache');
 
 /**
  * @swagger
@@ -173,6 +174,52 @@ router.get('/following', protect, validate(feedQuerySchema, 'query'), videoContr
 
 /**
  * @swagger
+ * /videos/for-you:
+ *   get:
+ *     tags: [Videos]
+ *     summary: Personalized "For You" feed (Bonus)
+ *     description: |
+ *       Returns videos sorted by:
+ *       1. Whether their owner is followed by the requesting user (followed first).
+ *       2. Effective score = trendingScore + freshness bonus (linear decay over 7 days).
+ *       3. Recency as a tiebreaker.
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, minimum: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, minimum: 1, maximum: 100 }
+ *     responses:
+ *       200:
+ *         description: Paginated personalized feed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: success }
+ *                 results: { type: integer }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     videos:
+ *                       type: array
+ *                       items: { type: object }
+ *                     page: { type: integer }
+ *                     totalPages: { type: integer }
+ *       401:
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+router.get('/for-you', protect, validate(feedQuerySchema, 'query'), videoController.getForYouFeed);
+
+/**
+ * @swagger
  * /videos/trending:
  *   get:
  *     tags: [Videos]
@@ -214,7 +261,7 @@ router.get('/following', protect, validate(feedQuerySchema, 'query'), videoContr
  *                     totalPages:
  *                       type: integer
  */
-router.get('/trending', validate(feedQuerySchema, 'query'), videoController.getTrendingFeed);
+router.get('/trending', trendingCache(60), validate(feedQuerySchema, 'query'), videoController.getTrendingFeed);
 
 /**
  * @swagger

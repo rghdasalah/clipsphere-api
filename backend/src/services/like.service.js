@@ -3,6 +3,7 @@ const Video = require('../models/Video');
 const User = require('../models/User');
 const { AppError } = require('../middleware/errorHandler');
 const notificationService = require('./notification.service');
+const { bustTrending } = require('../middleware/cache');
 
 exports.likeVideo = async (userId, videoId, io) => {
   const video = await Video.findById(videoId);
@@ -39,6 +40,8 @@ exports.likeVideo = async (userId, videoId, io) => {
     videoId: video._id
   });
 
+  await Video.findByIdAndUpdate(videoId, { $inc: { trendingScore: 10 } });
+  bustTrending();
   return { likeCount };
 };
 
@@ -50,5 +53,7 @@ exports.unlikeVideo = async (userId, videoId) => {
   if (!result) throw new AppError('Like not found', 404);
 
   const likeCount = await Like.countDocuments({ video: videoId });
+  await Video.findByIdAndUpdate(videoId, { $inc: { trendingScore: -10 } });
+  bustTrending();
   return { likeCount };
 };

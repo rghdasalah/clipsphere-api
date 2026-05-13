@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useSocket } from "@/context/SocketContext";
-import { getAvatarUrl } from "@/utils/avatarUrl";
+import { getAvatarUrl, subscribeAvatarChanges } from "@/utils/avatarUrl";
 
 export default function Navbar() {
   const { user, isAuthenticated, logout } = useAuth();
@@ -13,9 +13,17 @@ export default function Navbar() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user?._id) {
-      getAvatarUrl(user._id).then(setAvatarUrl);
+    const uid = user?._id;
+    if (!uid) {
+      setAvatarUrl(null);
+      return;
     }
+    getAvatarUrl(uid).then(setAvatarUrl);
+    return subscribeAvatarChanges((changedId) => {
+      if (changedId === uid) {
+        getAvatarUrl(uid).then(setAvatarUrl);
+      }
+    });
   }, [user?._id]);
 
   return (

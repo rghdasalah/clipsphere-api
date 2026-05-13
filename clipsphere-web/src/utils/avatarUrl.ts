@@ -9,6 +9,16 @@ interface CacheEntry {
 
 const cache = new Map<string, CacheEntry>();
 
+type Listener = (userId: string) => void;
+const listeners = new Set<Listener>();
+
+export function subscribeAvatarChanges(fn: Listener): () => void {
+  listeners.add(fn);
+  return () => {
+    listeners.delete(fn);
+  };
+}
+
 /**
  * Get a presigned avatar URL for a user.
  * Results are cached in-memory with a 5-minute TTL.
@@ -38,4 +48,5 @@ export async function getAvatarUrl(
  */
 export function invalidateAvatarCache(userId: string): void {
   cache.delete(userId);
+  listeners.forEach((fn) => fn(userId));
 }

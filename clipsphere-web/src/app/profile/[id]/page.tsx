@@ -17,6 +17,7 @@ interface PageProps {
 export default function ProfilePage({ params }: PageProps) {
   const { id } = use(params);
   const { user: currentUser } = useAuth();
+  const currentUserId = currentUser?._id;
 
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -26,7 +27,7 @@ export default function ProfilePage({ params }: PageProps) {
   const [isFollowing, setIsFollowing] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
-  const isOwnProfile = currentUser?._id === id;
+  const isOwnProfile = currentUserId === id;
 
   const fetchProfile = useCallback(async () => {
     try {
@@ -45,12 +46,11 @@ export default function ProfilePage({ params }: PageProps) {
       const url = await getAvatarUrl(id);
       setAvatarUrl(url);
 
-      // Check if current user is in the followers list
-      if (currentUser) {
+      if (currentUserId) {
         const isInList = followers.some(
           (f: { followerId: string | { _id: string } }) => {
             const fid = typeof f.followerId === "string" ? f.followerId : f.followerId?._id;
-            return fid === currentUser._id;
+            return fid === currentUserId;
           }
         );
         setIsFollowing(isInList);
@@ -60,7 +60,7 @@ export default function ProfilePage({ params }: PageProps) {
     } finally {
       setLoading(false);
     }
-  }, [id, currentUser]);
+  }, [id, currentUserId]);
 
   useEffect(() => {
     fetchProfile();

@@ -30,6 +30,15 @@ export type LiveNotification =
       senderUsername: string;
       amountFormatted: string;
       createdAt: Date;
+    }
+  | {
+      id: string;
+      type: "new-review";
+      reviewerUsername: string;
+      rating: number;
+      videoTitle: string;
+      videoId: string;
+      createdAt: Date;
     };
 
 interface SocketContextType {
@@ -95,8 +104,10 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     const token = Cookies.get("token");
     if (!token) return;
 
+    // Same-origin by default — works behind nginx in prod and lets dev override
+    // via NEXT_PUBLIC_SOCKET_URL (baked at build time by the Dockerfile ARG).
     const socketUrl =
-      process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:5000";
+      process.env.NEXT_PUBLIC_SOCKET_URL || window.location.origin;
 
     const socket = io(socketUrl, {
       auth: { token },
@@ -135,6 +146,27 @@ export function SocketProvider({ children }: { children: ReactNode }) {
           type: "new-tip",
           senderUsername: data.senderUsername,
           amountFormatted: data.amountFormatted,
+          createdAt: new Date(),
+        });
+      }
+    );
+
+    socket.on(
+      "new-review",
+      (data: {
+        reviewerUsername: string;
+        rating: number;
+        videoTitle: string;
+        videoId: string;
+      }) => {
+        setUnreadCount((prev) => prev + 1);
+        setActiveToast({
+          id: `${Date.now()}-${Math.random()}`,
+          type: "new-review",
+          reviewerUsername: data.reviewerUsername,
+          rating: data.rating,
+          videoTitle: data.videoTitle,
+          videoId: data.videoId,
           createdAt: new Date(),
         });
       }

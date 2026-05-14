@@ -5,7 +5,7 @@ import Link from "next/link";
 import clsx from "clsx";
 
 interface LiveToastProps {
-  kind: "like" | "tip";
+  kind: "like" | "tip" | "review";
   primaryText: string;
   secondaryText?: string;
   href?: string;
@@ -15,11 +15,13 @@ interface LiveToastProps {
 const ICON: Record<LiveToastProps["kind"], string> = {
   like: "♥",
   tip: "💸",
+  review: "⭐",
 };
 
 const HEADER: Record<LiveToastProps["kind"], string> = {
   like: "New Like!",
   tip: "New Tip!",
+  review: "New Review!",
 };
 
 export default function LiveToast({

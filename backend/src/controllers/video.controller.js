@@ -23,7 +23,8 @@ exports.deleteVideo = asyncWrapper(async (req, res) => {
 });
 
 exports.addReview = asyncWrapper(async (req, res) => {
-  const review = await videoService.addReview(req.user.id, req.params.id, req.body);
+  const io = req.app.get('io');
+  const review = await videoService.addReview(req.user.id, req.params.id, req.body, io);
   res.status(201).json({ status: 'success', data: review });
 });
 

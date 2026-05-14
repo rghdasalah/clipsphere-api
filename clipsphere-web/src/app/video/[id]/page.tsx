@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import api from "@/services/api";
 import type { Video } from "@/types";
@@ -12,6 +13,7 @@ import TipButton from "@/components/video/TipButton";
 import CommentSection from "@/components/video/CommentSection";
 import StarRating from "@/components/video/StarRating";
 import Spinner from "@/components/ui/Spinner";
+import FollowButton from "@/components/profile/FollowButton";
 import EditVideoModal from "@/components/upload/EditVideoModal";
 import DeleteConfirmModal from "@/components/upload/DeleteConfirmModal";
 
@@ -30,6 +32,7 @@ export default function VideoDetailPage({ params }: PageProps) {
   const [stub, setStub] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
+  const [isFollowingOwner, setIsFollowingOwner] = useState(false);
 
   // Stream URL state
   const [presignedUrl, setPresignedUrl] = useState("");
@@ -85,6 +88,38 @@ export default function VideoDetailPage({ params }: PageProps) {
       cancelled = true;
     };
   }, [id, fetchStreamUrl]);
+
+  // Pull the creator's followers list once we know who they are, so the inline
+  // FollowButton starts in the correct state. Same shape as profile/[id].
+  useEffect(() => {
+    const ownerId = video?.owner?._id;
+    const me = user?._id;
+    if (!ownerId || !me || ownerId === me) {
+      setIsFollowingOwner(false);
+      return;
+    }
+    let cancelled = false;
+    api
+      .get(`/users/${ownerId}/followers`)
+      .then(({ data }) => {
+        if (cancelled) return;
+        const followers = data?.data ?? [];
+        const matched = followers.some(
+          (f: { followerId: string | { _id: string } }) => {
+            const fid =
+              typeof f.followerId === "string" ? f.followerId : f.followerId?._id;
+            return fid === me;
+          }
+        );
+        setIsFollowingOwner(matched);
+      })
+      .catch(() => {
+        if (!cancelled) setIsFollowingOwner(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [video?.owner?._id, user?._id]);
 
   // Re-fetch presigned URL on <video> error (max 1 retry)
   useEffect(() => {
@@ -238,13 +273,25 @@ export default function VideoDetailPage({ params }: PageProps) {
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-500/20 text-sm font-semibold text-brand-400">
-                  {video.owner.username?.charAt(0).toUpperCase() ?? "?"}
-                </div>
-                <span className="text-sm font-medium text-text-strong">
-                  {video.owner.username}
-                </span>
+              <div className="flex items-center gap-3">
+                <Link
+                  href={`/profile/${video.owner._id}`}
+                  className="flex items-center gap-2 hover:opacity-90 transition-opacity"
+                >
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-500/20 text-sm font-semibold text-brand-400">
+                    {video.owner.username?.charAt(0).toUpperCase() ?? "?"}
+                  </div>
+                  <span className="text-sm font-medium text-text-strong hover:text-brand-400 transition-colors">
+                    {video.owner.username}
+                  </span>
+                </Link>
+                {isAuthenticated && !isOwner && (
+                  <FollowButton
+                    userId={video.owner._id}
+                    isFollowing={isFollowingOwner}
+                    onToggle={() => setIsFollowingOwner((prev) => !prev)}
+                  />
+                )}
               </div>
 
               {video.description && (

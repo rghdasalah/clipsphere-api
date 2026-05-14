@@ -9,7 +9,16 @@ import SkeletonFeed from "@/components/feed/SkeletonFeed";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 
-type Tab = "trending" | "following";
+type Tab = "trending" | "following" | "for-you";
+
+// Endpoint per tab — kept inline so the auth-only tabs can also drive the
+// "log in to view" empty state below.
+const ENDPOINT_BY_TAB: Record<Tab, string> = {
+  trending: "/videos/trending",
+  following: "/videos/following",
+  "for-you": "/videos/for-you",
+};
+const AUTH_ONLY_TABS: Tab[] = ["following", "for-you"];
 
 export default function FeedsPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -33,7 +42,7 @@ export default function FeedsPage() {
       setError(null);
 
       try {
-        const endpoint = activeTab === "trending" ? "/videos/trending" : "/videos/following";
+        const endpoint = ENDPOINT_BY_TAB[activeTab];
         const { data } = await api.get<ApiResponse<PaginatedResponse<Video>>>(endpoint, {
           params: { page: pageNum, limit: 20 },
         });
@@ -57,7 +66,7 @@ export default function FeedsPage() {
   // Reset and fetch on tab change (wait for auth to settle)
   useEffect(() => {
     if (authLoading) return;
-    if (activeTab === "following" && !isAuthenticated) return;
+    if (AUTH_ONLY_TABS.includes(activeTab) && !isAuthenticated) return;
     setVideos([]);
     setPage(1);
     setTotalPages(1);
@@ -92,17 +101,24 @@ export default function FeedsPage() {
           Trending
         </button>
         {isAuthenticated && (
-          <button className={tabClasses("following")} onClick={() => switchTab("following")}>
-            Following
-          </button>
+          <>
+            <button className={tabClasses("for-you")} onClick={() => switchTab("for-you")}>
+              For You
+            </button>
+            <button className={tabClasses("following")} onClick={() => switchTab("following")}>
+              Following
+            </button>
+          </>
         )}
       </div>
 
       {/* Content */}
-      {activeTab === "following" && !isAuthenticated ? (
+      {AUTH_ONLY_TABS.includes(activeTab) && !isAuthenticated ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <p className="text-lg font-medium text-text-muted">
-            Log in to see videos from creators you follow
+            {activeTab === "following"
+              ? "Log in to see videos from creators you follow"
+              : "Log in to see your personalized feed"}
           </p>
           <a
             href="/login"
@@ -126,7 +142,9 @@ export default function FeedsPage() {
           <p className="text-lg font-medium text-text-muted">
             {activeTab === "trending"
               ? "No trending videos yet"
-              : "Follow creators to see their videos here"}
+              : activeTab === "for-you"
+                ? "No videos to show yet — follow some creators or check Trending"
+                : "Follow creators to see their videos here"}
           </p>
         </div>
       ) : (

@@ -51,13 +51,30 @@ exports.deleteVideo = async (videoId) => {
   if (wasPublic) bustTrending();
 };
 
-exports.addReview = async (userId, videoId, data) => {
+exports.addReview = async (userId, videoId, data, io) => {
   const video = await Video.findById(videoId);
   if (!video) throw new AppError('Video not found', 404);
 
   const review = await Review.create({ ...data, user: userId, video: videoId });
   await review.populate('user', 'username avatarKey');
   const videoOwner = await User.findById(video.owner);
+
+  // Real-time socket notification to the video owner's private room — gated on
+  // the recipient's in-app "comments" preference (reviews map to the comments
+  // toggle, same as the persisted notification below).
+  if (
+    io &&
+    videoOwner &&
+    video.owner.toString() !== userId.toString() &&
+    videoOwner.notificationPreferences?.inApp?.comments
+  ) {
+    io.to(video.owner.toString()).emit('new-review', {
+      reviewerUsername: review.user?.username ?? 'Someone',
+      rating: review.rating,
+      videoTitle: video.title,
+      videoId: video._id.toString()
+    });
+  }
 
   await notificationService.handlePreferenceAwareNotification({
     recipientUser: videoOwner,

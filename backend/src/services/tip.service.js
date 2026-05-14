@@ -83,25 +83,33 @@ exports.handleWebhookEvent = async (payload, sig, io = null) => {
     $inc: { walletBalance: amountCents },
   });
 
-  // Persist as an in-app notification so the badge survives a reload.
-  await Notification.create({
-    recipient: recipientId,
-    actor: senderId,
-    type: 'tip',
-    channel: 'inApp',
-  });
+  // Honor the recipient's in-app "tips" preference for both the persisted
+  // notification record and the live toast — disabling the toggle should fully
+  // silence tip notifications, not just the persisted half.
+  const recipientUser = await User.findById(recipientId).select(
+    'username notificationPreferences'
+  );
+  const tipsInAppEnabled = recipientUser?.notificationPreferences?.inApp?.tips;
 
-  // Real-time toast to the creator's private room (best-effort).
-  if (io) {
-    try {
-      const sender = await User.findById(senderId).select('username');
-      io.to(recipientId.toString()).emit('new-tip', {
-        senderUsername: sender?.username ?? 'Someone',
-        amountCents,
-        amountFormatted: `$${(amountCents / 100).toFixed(2)}`,
-      });
-    } catch (err) {
-      console.warn('[tips] failed to emit new-tip:', err.message);
+  if (tipsInAppEnabled) {
+    await Notification.create({
+      recipient: recipientId,
+      actor: senderId,
+      type: 'tip',
+      channel: 'inApp',
+    });
+
+    if (io) {
+      try {
+        const sender = await User.findById(senderId).select('username');
+        io.to(recipientId.toString()).emit('new-tip', {
+          senderUsername: sender?.username ?? 'Someone',
+          amountCents,
+          amountFormatted: `$${(amountCents / 100).toFixed(2)}`,
+        });
+      } catch (err) {
+        console.warn('[tips] failed to emit new-tip:', err.message);
+      }
     }
   }
 };

@@ -9,6 +9,13 @@ RUN --mount=type=cache,target=/root/.npm \
 FROM node:20-bookworm-slim AS builder
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
+# NEXT_PUBLIC_* vars are inlined into the client bundle at build time, so they
+# must be present here — setting them only at runtime in compose has no effect
+# on what reaches the browser.
+ARG NEXT_PUBLIC_API_URL=/api/v1
+ARG NEXT_PUBLIC_SOCKET_URL=https://clipsphere.local
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
+    NEXT_PUBLIC_SOCKET_URL=$NEXT_PUBLIC_SOCKET_URL
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build

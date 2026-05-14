@@ -34,5 +34,18 @@ export default function NotificationListener() {
     );
   }
 
+  if (activeToast.type === "new-review") {
+    return (
+      <LiveToast
+        key={activeToast.id}
+        kind="review"
+        primaryText={`${activeToast.reviewerUsername} reviewed your video (${activeToast.rating}/5)`}
+        secondaryText={`"${activeToast.videoTitle}"`}
+        href={`/video/${activeToast.videoId}`}
+        onClose={dismissToast}
+      />
+    );
+  }
+
   return null;
 }

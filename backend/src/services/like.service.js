@@ -22,8 +22,15 @@ exports.likeVideo = async (userId, videoId, io) => {
 
   const videoOwner = await User.findById(video.owner);
 
-  // Real-time socket notification to the video owner's private room
-  if (io && videoOwner && video.owner.toString() !== userId.toString()) {
+  // Real-time socket notification to the video owner's private room — honor
+  // the recipient's in-app preference so disabling "Likes" silences the toast,
+  // not just the persisted notification record.
+  if (
+    io &&
+    videoOwner &&
+    video.owner.toString() !== userId.toString() &&
+    videoOwner.notificationPreferences?.inApp?.likes
+  ) {
     const liker = await User.findById(userId).select('username');
     io.to(video.owner.toString()).emit('new-like', {
       likerUsername: liker?.username ?? 'Someone',
